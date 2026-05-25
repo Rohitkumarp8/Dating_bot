@@ -6,7 +6,7 @@ from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
     ConversationHandler, filters, ContextTypes
 )
-import anthropic
+from groq import Groq
 
 # ─── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # ─── Config ────────────────────────────────────────────────────────────────────
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "YOUR_BOT_TOKEN_HERE")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "YOUR_ANTHROPIC_KEY_HERE")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "YOUR_GROQ_KEY_HERE")
 
 # ─── Conversation States ───────────────────────────────────────────────────────
 NAME, AGE, GENDER, LOOKING_FOR, BIO, PHOTO = range(6)
@@ -81,22 +81,21 @@ def get_potential_matches(user_id, gender_pref, my_gender):
 # ─── AI Helper ─────────────────────────────────────────────────────────────────
 def get_ai_icebreaker(my_profile: dict, their_profile: dict) -> str:
     try:
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        prompt = f"""
-You are a friendly dating coach. Generate a fun, short icebreaker message (2-3 sentences max) 
+        client = Groq(api_key=GROQ_API_KEY)
+        prompt = f"""You are a friendly dating coach. Generate a fun, short icebreaker message (2-3 sentences max) 
 that {my_profile['name']} can send to {their_profile['name']}.
 
 My profile: Name={my_profile['name']}, Age={my_profile['age']}, Bio={my_profile['bio']}
 Their profile: Name={their_profile['name']}, Age={their_profile['age']}, Bio={their_profile['bio']}
 
-Keep it light, fun and genuine. No emojis overload. Respond in the same language as the bio.
-"""
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=200,
-            messages=[{"role": "user", "content": prompt}]
+Keep it light, fun and genuine. No emojis overload. Respond in the same language as the bio."""
+
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama3-8b-8192",
+            max_tokens=200
         )
-        return message.content[0].text
+        return chat_completion.choices[0].message.content
     except Exception as e:
         logger.error(f"AI error: {e}")
         return f"Hey {their_profile['name']}! I came across your profile and thought we might vibe. How are you? 😊"
